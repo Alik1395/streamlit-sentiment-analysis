@@ -3,48 +3,59 @@ from confluent_kafka import Consumer
 import pandas as pd
 import json
 
-# Kafka credentials from your config
+# Kafka config
 conf = {
-    'bootstrap.servers': 'pkc-ewzgj.europe-west4.gcp.confluent.cloud:9092',
+    'bootstrap.servers': '...',
     'security.protocol': 'SASL_SSL',
     'sasl.mechanism': 'PLAIN',
-    'sasl.username': 'PTIXVVZQMGGZXODW',
-    'sasl.password': 'fbvBdgp8JZCWZLyQx/+Ca9f+bfGA1l2kOQX+XnD30AKqeVUimNCAU0GZxJtJEgdX',
+    'sasl.username': '...',
+    'sasl.password': '...',
     'group.id': 'streamlit-dashboard-group',
-    'auto.offset.reset': 'latest',
-    'session.timeout.ms': 50000
+    'auto.offset.reset': 'latest'
 }
 
-# Streamlit layout
+# Streamlit setup
 st.set_page_config(page_title="Sentiment Dashboard", layout="wide")
 st.title("🧠 Sentiment Analysis Dashboard")
 
-placeholder = st.empty()
-
 # Kafka consumer setup
 consumer = Consumer(conf)
-consumer.subscribe(['customer_reviews'])  # ✅ your topic here
+consumer.subscribe(['customer_reviews'])
 
-# Store messages
+# Placeholder for live updating
+placeholder = st.empty()
 messages = []
 
-with placeholder.container():
-    while True:
-        msg = consumer.poll(1.0)
-        if msg is None:
-            continue
-        if msg.error():
-            st.error(f"Kafka error: {msg.error()}")
-            continue
-        try:
-            value = json.loads(msg.value().decode('utf-8'))
-            row = {
-                "review": value.get("text", ""),
-                "sentiment": value.get("sentiment", "n/a"),
-                "next_best_action": value.get("next_best_action", "n/a")
-            }
-            messages.append(row)
-            df = pd.DataFrame(messages)
+def sentiment_icon(sentiment):
+    if sentiment.lower() == "positive":
+        return "🟢 Positive"
+    elif sentiment.lower() == "neutral":
+        return "🟡 Neutral"
+    elif sentiment.lower() == "negative":
+        return "🔴 Negative"
+    else:
+        return "⚪ n/a"
+
+while True:
+    msg = consumer.poll(1.0)
+    if msg is None:
+        continue
+    if msg.error():
+        st.error(f"Kafka error: {msg.error()}")
+        continue
+
+    try:
+        value = json.loads(msg.value().decode("utf-8"))
+        row = {
+            "Review": value.get("text", ""),
+            "Sentiment": sentiment_icon(value.get("sentiment", "n/a")),
+            "Next Best Action": value.get("next_best_action", "n/a")
+        }
+        messages.append(row)
+        messages = messages[-50:]  # Limit to latest 50 messages
+        df = pd.DataFrame(messages)
+
+        with placeholder:
             st.dataframe(df, use_container_width=True)
-        except Exception as e:
-            st.warning(f"Could not parse message: {e}")
+    except Exception as e:
+        st.warning(f"Could not parse message: {e}")
