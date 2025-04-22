@@ -4,63 +4,69 @@ import json
 from confluent_kafka import Consumer
 import plotly.express as px
 
-# Kafka config
+# --- Kafka config ---
 conf = {
-    'bootstrap.servers': 'your-confluent-bootstrap-url:9092',
+    'bootstrap.servers': 'YOUR-CONFLUENT-BOOTSTRAP',
     'security.protocol': 'SASL_SSL',
     'sasl.mechanism': 'PLAIN',
-    'sasl.username': 'your-confluent-username',
-    'sasl.password': 'your-confluent-password',
-    'group.id': 'streamlit-dashboard',
+    'sasl.username': 'YOUR-USERNAME',
+    'sasl.password': 'YOUR-PASSWORD',
+    'group.id': 'streamlit-viz-group',
     'auto.offset.reset': 'latest'
 }
 
 TOPIC = 'customer_reviews'
 
-# Create Streamlit layout
-st.set_page_config(page_title="📊 Review Stream Dashboard", layout="wide")
-st.title("📈 Real-time Review Stream Dashboard")
+# --- Streamlit layout ---
+st.set_page_config(page_title="💬 Sentiment Dashboard", layout="wide")
+st.markdown("## 🧠 Sentiment Analysis Dashboard")
+st.caption("Live Kafka stream of Uzbek product reviews")
 
-# Kafka consumer
+# --- Kafka Consumer ---
 consumer = Consumer(conf)
 consumer.subscribe([TOPIC])
 
-# Session state to persist messages
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+# Session state to persist reviews
+if "data" not in st.session_state:
+    st.session_state["data"] = []
 
-# Poll Kafka for new messages
-new_data = []
-for _ in range(20):  # poll 20 new records per refresh
-    msg = consumer.poll(timeout=0.1)
-    if msg is None:
-        continue
-    if msg.error():
-        st.warning(f"Kafka error: {msg.error()}")
-        continue
-    try:
-        val = json.loads(msg.value().decode('utf-8'))
-        new_data.append(val)
-    except Exception as e:
-        st.error(f"JSON decode error: {e}")
+# Poll for new messages
+new_rows = []
+for _ in range(30):
+    msg = consumer.poll(timeout=0.2)
+    if msg and msg.value():
+        try:
+            record = json.loads(msg.value().decode('utf-8'))
+            new_rows.append(record)
+        except:
+            continue
 
-# Update stream
-st.session_state["messages"].extend(new_data)
-df = pd.DataFrame(st.session_state["messages"][-200:])  # show last 200 rows
+st.session_state["data"].extend(new_rows)
+df = pd.DataFrame(st.session_state["data"][-150:])  # last 150 records
 
-# Display Data Table
-st.subheader("📋 Latest Reviews")
-st.dataframe(df[[
-    "date", "publisher", "product_name", "review_score", "sentiment", "topic", "recommended_action"
-]].sort_values("date", ascending=False), use_container_width=True)
-
-# Sentiment Distribution
 if not df.empty:
-    st.subheader("📊 Sentiment Distribution")
-    sentiment_chart = df["sentiment"].value_counts().reset_index()
-    sentiment_chart.columns = ["Sentiment", "Count"]
-    fig = px.bar(sentiment_chart, x="Sentiment", y="Count", color="Sentiment", height=300)
+    # --- Clean table display ---
+    st.markdown("### 📋 Latest Reviews")
+    st.dataframe(
+        df[[
+            "date", "publisher", "product_name", "review_score", "sentiment", "topic", "recommended_action"
+        ]].sort_values("date", ascending=False),
+        use_container_width=True
+    )
+
+    # --- Sentiment distribution ---
+    st.markdown("### 📊 Sentiment Breakdown")
+    sentiment_counts = df["sentiment"].value_counts().reset_index()
+    sentiment_counts.columns = ["Sentiment", "Count"]
+
+    fig = px.bar(
+        sentiment_counts,
+        x="Sentiment", y="Count",
+        color="Sentiment",
+        color_discrete_sequence=px.colors.qualitative.Set2,
+        height=300
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-# Auto-refresh
-st.experimental_rerun()
+# --- Auto-refresh note ---
+st.markdown("⌛ Auto-refreshing every time new messages arrive.")
