@@ -6,11 +6,11 @@ import plotly.express as px
 
 # --- Kafka config ---
 conf = {
-    'bootstrap.servers': 'YOUR-CONFLUENT-BOOTSTRAP',
+    'bootstrap.servers': 'pkc-ewzgj.europe-west4.gcp.confluent.cloud:9092',
     'security.protocol': 'SASL_SSL',
     'sasl.mechanism': 'PLAIN',
-    'sasl.username': 'YOUR-USERNAME',
-    'sasl.password': 'YOUR-PASSWORD',
+    'sasl.username': 'PTIXVVZQMGGZXODW',
+    'sasl.password': 'fbvBdgp8JZCWZLyQx/+Ca9f+bfGA1l2kOQX+XnD30AKqeVUimNCAU0GZxJtJEgdX',
     'group.id': 'streamlit-viz-group',
     'auto.offset.reset': 'latest'
 }
